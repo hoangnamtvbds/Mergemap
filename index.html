@@ -447,6 +447,9 @@
       let dmsP9Map = {};
 
       dmsRows.forEach(row => {
+        let statusDms = String(row['Trạng thái'] || row['Status'] || '').trim().toLowerCase();
+        if (statusDms && statusDms !== 'active') return; // Tự động bỏ qua Inactive
+
         let lat = parseFloat(row['La'] || row['Lat'] || row['Vĩ độ']);
         let lon = parseFloat(row['Long'] || row['Lon'] || row['Kinh độ']);
         if (isNaN(lat) || isNaN(lon)) return;
