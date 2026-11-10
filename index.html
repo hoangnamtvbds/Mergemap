@@ -199,7 +199,7 @@
       </div>
       <div class="space-y-1 text-xs">
         <label class="text-slate-600">Dán Link Google Maps / Link Zalo hoặc Tọa độ thẳng (Lat, Long):</label>
-        <textarea id="modalUrlInput" rows="3" placeholder="https://maps.app.goo.gl/... hoặc 11.16892, 106.61245" class="w-full p-2 border rounded text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500"></textarea>
+        <textarea id="modalUrlInput" rows="3" placeholder="https://maps.app.goo.gl/... hoặc 11.16892, 106.61245 hoặc 11,1424310, 106,5546990" class="w-full p-2 border rounded text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500"></textarea>
       </div>
       <div class="flex justify-end gap-2">
         <button onclick="closeZaloLinkModal()" class="px-3 py-1 rounded border text-xs text-slate-600 hover:bg-slate-50">Hủy</button>
@@ -543,7 +543,6 @@
             let roadScore = commonRoads.size ? 30 : 0;
             let nameSim = calcTokenSimilarity(pureName, d.pureName);
             
-            // Chỉ tính nếu tên thuần có chút tương đồng
             if (nameSim >= 40 || (commonRoads.size > 0 && nameSim >= 25)) {
               let total = (nameSim * 0.7) + roadScore;
               if (total > bestScore) {
@@ -587,7 +586,6 @@
     }
 
     function sortKvList() {
-      // Sắp xếp các điểm Suggest theo % giảm dần từ cao xuống thấp
       kvList.sort((a, b) => {
         if (a.status === 'suggest' && b.status === 'suggest') {
           return (b.matchScore || 0) - (a.matchScore || 0);
@@ -697,6 +695,11 @@
         let matchText = removeDiacritics(k.name + ' ' + k.id + ' ' + k.phone + ' ' + k.addr);
         return matchText.includes(query);
       });
+
+      // LUÔN LUÔN SORT GIẢM DẦN THEO % TƯƠNG ĐỒNG KHI Ở TAB "GỢI Ý"
+      if (currentTab === 'suggest') {
+        filtered.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+      }
 
       let container = document.getElementById('customerListView');
       if (!filtered.length) {
@@ -864,6 +867,8 @@
       document.getElementById('badgeMatched').innerText = matched;
     }
 
+    // Modal Zalo / Google Maps
+    
     // Kích hoạt chế độ ghim trên Map cho quán cụ thể
     window.triggerPinMode = function(event, id) {
       if (event) event.stopPropagation();
@@ -974,17 +979,33 @@
       if (!text) return null;
       let str = String(text);
 
-      // Dạng 1: @11.123456,106.123456 hoặc ?q=11.123456,106.123456 hoặc số thuần
-      let m1 = str.match(/(?:@|\?q=|\/place\/)?(1[0-2]\.\d{4,8})\s*[,;/\-\s]\s*(10[5-7]\.\d{4,8})/);
-      if (m1) return { lat: parseFloat(m1[1]), lon: parseFloat(m1[2]) };
+      // Bắt mọi định dạng Lat (10-12) và Lon (105-108) dùng cả DẤU CHẤM (.) lẫn DẤU PHẨY (,) thập phân
+      // Xử lý hoàn hảo chuỗi: "11,1424310, 106,5546990" hoặc "11.1424310, 106.5546990"
+      let m1 = str.match(/(?:@|\?q=|\/place\/|loc:)?\s*(1[0-2])[.,](\d{3,9})\s*[,;/\-\s]\s*(10[5-8])[.,](\d{3,9})/);
+      if (m1) {
+        return {
+          lat: parseFloat(m1[1] + '.' + m1[2]),
+          lon: parseFloat(m1[3] + '.' + m1[4])
+        };
+      }
 
-      // Dạng 2: !3d11.123456!4d106.123456 trong data URL của Google Maps
-      let m2 = str.match(/!3d(1[0-2]\.\d{4,8})!4d(10[5-7]\.\d{4,8})/);
-      if (m2) return { lat: parseFloat(m2[1]), lon: parseFloat(m2[2]) };
+      // Dạng data URL của Google Maps: !3d11.123456!4d106.123456
+      let m2 = str.match(/!3d(1[0-2])[.,](\d{3,9})!4d(10[5-8])[.,](\d{3,9})/);
+      if (m2) {
+        return {
+          lat: parseFloat(m2[1] + '.' + m2[2]),
+          lon: parseFloat(m2[3] + '.' + m2[4])
+        };
+      }
 
-      // Dạng 3: [106.123456, 11.123456] đảo ngược
-      let m3 = str.match(/(10[5-7]\.\d{4,8})\s*[,;/\-\s]\s*(1[0-2]\.\d{4,8})/);
-      if (m3) return { lat: parseFloat(m3[2]), lon: parseFloat(m3[1]) };
+      // Dạng đảo ngược: Long trước, Lat sau [106.xxx, 11.xxx]
+      let m3 = str.match(/(10[5-8])[.,](\d{3,9})\s*[,;/\-\s]\s*(1[0-2])[.,](\d{3,9})/);
+      if (m3) {
+        return {
+          lat: parseFloat(m3[3] + '.' + m3[4]),
+          lon: parseFloat(m3[1] + '.' + m3[2])
+        };
+      }
 
       return null;
     }
