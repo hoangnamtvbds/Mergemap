@@ -86,7 +86,7 @@
   <!-- WORKSPACE -->
   <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
     
-    <!-- LEFT PANEL: DANH SÁCH KHÁCH HÀNG KIOTVIET (460px) -->
+    <!-- LEFT PANEL: DANH SÁCH KHÁCH HÀNG KIOTVIET (470px) -->
     <aside class="w-full md:w-[470px] bg-white border-r border-slate-200 flex flex-col shrink-0 z-10 shadow md:shadow-none h-1/2 md:h-full">
       
       <!-- STATS STRIP -->
@@ -167,7 +167,7 @@
           </button>
         </div>
 
-        <!-- Toggle all DMS pins (Off by default for clean view) -->
+        <!-- Toggle all DMS pins (Active only) -->
         <div class="bg-white/95 backdrop-blur px-2 py-1 rounded-lg shadow border border-slate-200 pointer-events-auto flex items-center gap-1.5 text-xs">
           <input type="checkbox" id="chkShowAllDms" onchange="toggleShowAllDmsPins()" class="rounded text-blue-600 cursor-pointer">
           <label for="chkShowAllDms" class="text-[11px] text-slate-600 cursor-pointer select-none">Hiện toàn bộ 1.734 điểm DMS Active</label>
@@ -203,7 +203,7 @@
       </div>
       <div class="flex justify-end gap-2">
         <button onclick="closeZaloLinkModal()" class="px-3 py-1 rounded border text-xs text-slate-600 hover:bg-slate-50">Hủy</button>
-        <button onclick="applyManualCoordinates()" class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold">Xác nhận</button>
+        <button id="btnConfirmCoords" onclick="applyManualCoordinates()" class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1">Xác nhận</button>
       </div>
     </div>
   </div>
@@ -214,7 +214,7 @@
     // =========================================================================
     let map = null;
     let currentTileLayer = null;
-    let allDmsLayerGroup = null;       // Chứa toàn bộ 4.900 điểm (Mặc định ẩn)
+    let allDmsLayerGroup = null;       // Chứa toàn bộ điểm Active (Mặc định ẩn)
     let nearbyDmsLayerGroup = null;    // Chỉ chứa 10-20 điểm lân cận quán đang chọn
     let selectedMarkerGroup = null;    // Ghim quán đang chọn (Đỏ nổi bật)
     const BEN_CAT_CENTER = [11.168, 106.612];
@@ -341,12 +341,12 @@
     // =========================================================================
     // 3. THUẬT TOÁN BÓC TÁCH TÊN TIỆM THỰC CHẤT (TÁCH BIỆT TÊN TIỆM & TÊN ĐƯỜNG)
     // =========================================================================
-    const ROAD_REGEX = /(db\d+[a-z]?|xc\d+[a-z]?|dj\d+[a-z]?|da\d+[a-z]?|dc\d+[a-z]?|dd\d+[a-z]?|na\d+[a-z]?|nb\d+[a-z]?|nc\d+[a-z]?|ne\d+[a-z]?|n\d+[a-z]?|d\d+[a-z]?|dt\s*7\d+[a-z]?|dh\s*\d+[a-z]?|ql\s*1[34]|hl\s*\d+|rach bap|ben suc|minh hung|tan lap|an dien|an tay|my phuoc\s*[1234]?|thoi hoa|hoa loi|chanh phu hoa|phu an|lai uyen|lai hung|long nguyen|tru van tho|cay truong|thanh tuyen|thanh an|dinh hoa|hiep an|vinh phu)/gi;
-    const STOPWORDS = /(tap hoa|th|bach hoa|bh|dai ly|dl|quan|nha hang|nh|tiem|cua hang|ch|sri|mini|mart|co|chu|anh|chi|ba|ong|em|di|bac|nghi trua.*|khu pho|kp|ap|to|duong|phuong|xa|thi tran|ben cat|binh duong|bau bang|dau tieng|thuan an|thu dau mot)/gi;
+    const ROAD_REGEX = /\b(db\d+[a-z]?|xc\d+[a-z]?|dj\d+[a-z]?|da\d+[a-z]?|dc\d+[a-z]?|dd\d+[a-z]?|na\d+[a-z]?|nb\d+[a-z]?|nc\d+[a-z]?|ne\d+[a-z]?|n\d+[a-z]?|d\d+[a-z]?|dt\s*7\d+[a-z]?|dh\s*\d+[a-z]?|ql\s*1[34]|hl\s*\d+|rach bap|ben suc|minh hung|tan lap|an dien|an tay|my phuoc\s*[1234]?|thoi hoa|hoa loi|chanh phu hoa|phu an|lai uyen|lai hung|long nguyen|tru van tho|cay truong|thanh tuyen|thanh an|dinh hoa|hiep an|vinh phu)\b/gi;
+    const STOPWORDS = /\b(tap hoa|th|bach hoa|bh|dai ly|dl|quan|nha hang|nh|tiem|cua hang|ch|sri|mini|mart|co|chu|anh|chi|ba|ong|em|di|bac|nghi trua.*|khu pho|kp|ap|to|duong|phuong|xa|thi tran|ben cat|binh duong|bau bang|dau tieng|thuan an|thu dau mot)\b/gi;
 
     function removeDiacritics(str) {
       if (!str) return '';
-      return String(str).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+      return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     }
 
     function cleanPhone(raw) {
@@ -363,7 +363,7 @@
 
     function extractRoads(text) {
       if (!text) return new Set();
-      let t = removeDiacritics(text).replace(/(dt|dh|ql|hl)\s+(\d+)/g, '$1$2').replace(/[^\w\s]/g, ' ');
+      let t = removeDiacritics(text).replace(/\b(dt|dh|ql|hl)\s+(\d+)/g, '$1$2').replace(/[^\w\s]/g, ' ');
       let matches = t.match(ROAD_REGEX);
       return new Set(matches ? matches.map(m => m.trim().toLowerCase()) : []);
     }
@@ -372,7 +372,6 @@
     function extractPureStoreName(fullName) {
       if (!fullName) return '';
       let s = fullName;
-      // Lấy phần đầu trước các dấu gạch ngang '-' hoặc dấu ngoặc '('
       if (s.includes('-')) s = s.split('-')[0];
       if (s.includes('(')) s = s.split('(')[0];
       if (s.includes(',')) s = s.split(',')[0];
@@ -392,7 +391,6 @@
       return union.size ? (inter.size / union.size) * 100 : 0;
     }
 
-    // Tính khoảng cách giữa 2 tọa độ (mét)
     function calcDistanceMeter(lat1, lon1, lat2, lon2) {
       const R = 6371e3;
       const phi1 = lat1 * Math.PI / 180;
@@ -797,11 +795,8 @@
         }).bindPopup(`<b>${k.name}</b><br><span class="text-xs text-slate-500">${k.matchedAddr || k.addr}</span>`).openPopup();
 
         selectedMarkerGroup.addLayer(targetMarker);
-
-        // Hiển thị các điểm DMS xung quanh bán kính 2km
         renderNearbyDmsPins(targetLat, targetLon);
       } else {
-        // Nếu chưa có tọa độ, bay về khu vực Bến Cát
         map.setView(BEN_CAT_CENTER, 13);
         nearbyDmsLayerGroup.clearLayers();
       }
@@ -869,8 +864,6 @@
       document.getElementById('badgeMatched').innerText = matched;
     }
 
-    // Modal Zalo / Google Maps
-    
     // Kích hoạt chế độ ghim trên Map cho quán cụ thể
     window.triggerPinMode = function(event, id) {
       if (event) event.stopPropagation();
@@ -909,17 +902,55 @@
       document.getElementById('zaloModal').classList.add('hidden');
     }
 
-    function applyManualCoordinates() {
+    async function applyManualCoordinates() {
       let input = document.getElementById('modalUrlInput').value.trim();
       let k = kvList.find(x => x.id === selectedCustId);
       if (!input || !k) return;
 
-      let match = input.match(/(1[0-2]\.\d{4,8})\s*[,;/\-\s]\s*(10[5-7]\.\d{4,8})/);
-      if (match) {
-        k.lat = parseFloat(match[1]);
-        k.lon = parseFloat(match[2]);
+      let btn = document.getElementById('btnConfirmCoords');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin inline mr-1"></i> Đang giải mã...';
+        if (window.lucide) lucide.createIcons();
+      }
+
+      // 1. Kiểm tra nếu có sẵn chuỗi tọa độ (Lat, Long) hoặc link đầy đủ chứa @11.xxx,106.xxx
+      let coords = extractLatLonFromText(input);
+      
+      // 2. Nếu là link rút gọn (goo.gl/maps hoặc maps.app.goo.gl)
+      if (!coords && (input.includes('goo.gl') || input.includes('maps.app.goo.gl') || input.includes('google.com/maps'))) {
+        try {
+          let proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(input);
+          let res = await fetch(proxyUrl, { signal: AbortSignal.timeout(4000) });
+          if (res.ok) {
+            let htmlText = await res.text();
+            coords = extractLatLonFromText(htmlText);
+          }
+        } catch (err) {
+          console.warn("CORS proxy 1 fail, trying proxy 2:", err);
+          try {
+            let proxyUrl2 = 'https://corsproxy.io/?' + encodeURIComponent(input);
+            let res2 = await fetch(proxyUrl2, { signal: AbortSignal.timeout(4000) });
+            if (res2.ok) {
+              let htmlText2 = await res2.text();
+              coords = extractLatLonFromText(htmlText2);
+            }
+          } catch (e2) {
+            console.warn("Proxy 2 failed:", e2);
+          }
+        }
+      }
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = 'Xác nhận';
+      }
+
+      if (coords) {
+        k.lat = coords.lat;
+        k.lon = coords.lon;
         k.status = 'matched';
-        k.tier = 'Gán qua Link / Tọa độ thủ công';
+        k.tier = 'Gán qua Link / Tọa độ Google';
         k.suggestedDms = null;
 
         closeZaloLinkModal();
@@ -927,14 +958,37 @@
         renderCustomerList();
         selectCustomer(k.id);
         saveStateToStorage();
+        alert(`Đã gán thành công tọa độ [${coords.lat}, ${coords.lon}] cho quán ${k.name}!`);
       } else {
-        alert("Không tìm thấy chuỗi tọa độ (Lat, Long). Vui lòng nhập dạng: 11.xxxx, 106.xxxx");
+        let openChoice = confirm(
+          "Link rút gọn (goo.gl) bảo mật nên trình duyệt chặn giải mã tự động.\n\n" +
+          "Anh có muốn MỞ LINK NÀY TRÊN GOOGLE MAPS để copy cặp số tọa độ (hoặc nhìn vị trí rồi click vào Map) không?"
+        );
+        if (openChoice) {
+          window.open(input, '_blank');
+        }
       }
     }
 
-    // =========================================================================
-    // 7. XUẤT MASTER EXCEL CHUẨN 2 SHEET
-    // =========================================================================
+    function extractLatLonFromText(text) {
+      if (!text) return null;
+      let str = String(text);
+
+      // Dạng 1: @11.123456,106.123456 hoặc ?q=11.123456,106.123456 hoặc số thuần
+      let m1 = str.match(/(?:@|\?q=|\/place\/)?(1[0-2]\.\d{4,8})\s*[,;/\-\s]\s*(10[5-7]\.\d{4,8})/);
+      if (m1) return { lat: parseFloat(m1[1]), lon: parseFloat(m1[2]) };
+
+      // Dạng 2: !3d11.123456!4d106.123456 trong data URL của Google Maps
+      let m2 = str.match(/!3d(1[0-2]\.\d{4,8})!4d(10[5-7]\.\d{4,8})/);
+      if (m2) return { lat: parseFloat(m2[1]), lon: parseFloat(m2[2]) };
+
+      // Dạng 3: [106.123456, 11.123456] đảo ngược
+      let m3 = str.match(/(10[5-7]\.\d{4,8})\s*[,;/\-\s]\s*(1[0-2]\.\d{4,8})/);
+      if (m3) return { lat: parseFloat(m3[2]), lon: parseFloat(m3[1]) };
+
+      return null;
+    }
+
     function exportMasterExcel() {
       if (!kvList.length) return alert("Chưa có dữ liệu!");
 
