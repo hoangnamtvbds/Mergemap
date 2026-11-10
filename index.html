@@ -1,601 +1,832 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FMCG Smart Master Data Matching - NPP Việt Bill</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- SheetJS (xlsx) CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>FMCG Master Map Merger - NPP Bến Cát</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Tùy chỉnh thanh cuộn & Bản đồ */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    #map { height: 100%; width: 100%; min-height: 420px; background: #e2e8f0; }
+    .leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+  </style>
 </head>
-<body class="bg-slate-50 font-sans text-slate-800 antialiased">
+<body class="bg-slate-100 h-screen w-screen flex flex-col font-sans overflow-hidden text-slate-800">
 
-    <div class="max-w-7xl mx-auto px-4 py-8">
-        <!-- Header -->
-        <header class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-6 rounded-2xl shadow-lg mb-8 flex flex-col md:flex-row justify-between items-center">
-            <div>
-                <h1 class="text-2xl md:text-3xl font-bold tracking-tight">FMCG Master Data Matching Engine</h1>
-                <p class="text-blue-100 text-sm mt-1">Hệ thống đối soát 4 tầng tự động gán tọa độ GPS KiotViet & DMS Carlsberg</p>
-            </div>
-            <div class="mt-4 md:mt-0 bg-blue-900/50 px-4 py-2 rounded-xl border border-blue-600/40 text-xs text-blue-200">
-                <i class="fa-solid fa-location-dot mr-1 text-red-400"></i> Cơ sở: Bến Cát - Bình Dương
-            </div>
-        </header>
-
-        <!-- Upload Section -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <!-- KiotViet Upload -->
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
-                <div>
-                    <div class="flex items-center space-x-3 mb-4">
-                        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">1</div>
-                        <h3 class="font-semibold text-lg text-slate-900">File KiotViet (Hóa đơn bán hàng)</h3>
-                    </div>
-                    <p class="text-sm text-slate-500 mb-4">Chứa thông tin Mã KH, Tên KH, SĐT, Địa chỉ, Người bán.</p>
-                </div>
-                <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-500 transition cursor-pointer relative bg-slate-50">
-                    <input type="file" id="fileKv" accept=".xlsx, .xls" class="absolute inset-0 opacity-0 cursor-pointer">
-                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-blue-500 mb-2"></i>
-                    <p id="labelKv" class="text-sm font-medium text-slate-700">Kéo thả file KiotViet hoặc <span class="text-blue-600 underline">chọn file</span></p>
-                </div>
-            </div>
-
-            <!-- DMS Upload -->
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
-                <div>
-                    <div class="flex items-center space-x-3 mb-4">
-                        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">2</div>
-                        <h3 class="font-semibold text-lg text-slate-900">File DMS (Carlsberg Benchmark)</h3>
-                    </div>
-                    <p class="text-sm text-slate-500 mb-4">Chứa danh sách điểm bán chuẩn, SĐT và tọa độ Lat/Long.</p>
-                </div>
-                <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-indigo-500 transition cursor-pointer relative bg-slate-50">
-                    <input type="file" id="fileDms" accept=".xlsx, .xls" class="absolute inset-0 opacity-0 cursor-pointer">
-                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-indigo-500 mb-2"></i>
-                    <p id="labelDms" class="text-sm font-medium text-slate-700">Kéo thả file DMS hoặc <span class="text-indigo-600 underline">chọn file</span></p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Action Button -->
-        <div class="text-center mb-10">
-            <button id="btnRun" onclick="runMatchingPipeline()" disabled class="bg-slate-300 text-slate-500 font-semibold px-8 py-4 rounded-xl shadow-md transition cursor-not-allowed text-base">
-                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Chạy Thuật Toán Đối Soát 4 Tầng
-            </button>
-        </div>
-
-        <!-- Results Dashboard (Hidden Initially) -->
-        <div id="resultsSection" class="hidden space-y-8">
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                    <p class="text-xs font-medium text-slate-500 uppercase">Tổng Khách Hàng KiotViet</p>
-                    <h3 id="statTotal" class="text-3xl font-bold text-slate-900 mt-2">0</h3>
-                </div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                    <p class="text-xs font-medium text-slate-500 uppercase">Đã Khớp GPS Thành Công</p>
-                    <h3 id="statMatched" class="text-3xl font-bold text-emerald-600 mt-2">0</h3>
-                </div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                    <p class="text-xs font-medium text-slate-500 uppercase">Tỷ Lệ Khớp Tự Động</p>
-                    <h3 id="statRate" class="text-3xl font-bold text-blue-600 mt-2">0%</h3>
-                </div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                    <p class="text-xs font-medium text-slate-500 uppercase">Cần Duyệt Tay (Sheet 2)</p>
-                    <h3 id="statReview" class="text-3xl font-bold text-amber-600 mt-2">0</h3>
-                </div>
-            </div>
-
-            <!-- Download Excel Button -->
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center">
-                <div>
-                    <h4 class="font-bold text-lg text-slate-900">Hoàn tất xử lý dữ liệu</h4>
-                    <p class="text-sm text-slate-500">File Excel đầu ra bao gồm 3 Sheet: Master Data, Danh sách cần duyệt, và Thống kê chi tiết.</p>
-                </div>
-                <button onclick="downloadExcel()" class="mt-4 sm:mt-0 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-3 rounded-xl shadow-md transition flex items-center space-x-2">
-                    <i class="fa-solid fa-file-excel text-lg"></i>
-                    <span>Tải File Master Data (Excel)</span>
-                </button>
-            </div>
-
-            <!-- Preview Tabs -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div class="flex border-b border-slate-200 bg-slate-50">
-                    <button onclick="switchTab('master')" id="tabMasterBtn" class="px-6 py-4 font-semibold text-sm text-blue-600 border-b-2 border-blue-600 bg-white">1. Master Data KiotViet (Xem trước)</button>
-                    <button onclick="switchTab('review')" id="tabReviewBtn" class="px-6 py-4 font-semibold text-sm text-slate-500 hover:text-slate-700">2. Danh Sách Cần Duyệt Tay</button>
-                </div>
-
-                <!-- Master Table -->
-                <div id="tabMaster" class="overflow-x-auto p-4 max-h-[500px] overflow-y-auto">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr class="bg-slate-100 text-slate-600 uppercase text-xs">
-                                <th class="p-3">Mã KH</th>
-                                <th class="p-3">Tên KH KiotViet</th>
-                                <th class="p-3">SĐT Chuẩn</th>
-                                <th class="p-3">Tọa độ GPS</th>
-                                <th class="p-3">Trạng thái</th>
-                                <th class="p-3">Cơ chế khớp</th>
-                            </tr>
-                        </thead>
-                        <tbody id="masterTableBody" class="divide-y divide-slate-100"></tbody>
-                    </table>
-                </div>
-
-                <!-- Review Table -->
-                <div id="tabReview" class="hidden overflow-x-auto p-4 max-h-[500px] overflow-y-auto">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr class="bg-slate-100 text-slate-600 uppercase text-xs">
-                                <th class="p-3">Mã KH</th>
-                                <th class="p-3">Tên KH</th>
-                                <th class="p-3">Tên Gợi ý (DMS)</th>
-                                <th class="p-3">Tọa độ Gợi ý</th>
-                                <th class="p-3">Điểm tương đồng</th>
-                                <th class="p-3">Lý do</th>
-                            </tr>
-                        </thead>
-                        <tbody id="reviewTableBody" class="divide-y divide-slate-100"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+  <!-- TOPBAR -->
+  <header class="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between shadow-md shrink-0 border-b border-slate-800">
+    <div class="flex items-center space-x-3">
+      <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-white shadow-inner">
+        <i data-lucide="map-pin" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h1 class="text-sm md:text-base font-bold tracking-tight flex items-center gap-2">
+          FMCG Master Map Merger
+          <span class="text-[10px] bg-blue-500/30 text-blue-300 font-semibold px-2 py-0.5 rounded-full border border-blue-400/30">NPP Bến Cát</span>
+        </h1>
+        <p class="text-[11px] text-slate-400">Đối soát trực quan KiotViet x DMS Carlsberg có định vị bản đồ</p>
+      </div>
     </div>
 
-    <!-- JavaScript Logic -->
-    <script>
-        let kvWorkbook = null;
-        let dmsWorkbook = null;
-        let finalMasterData = [];
-        let finalReviewData = [];
-        let finalSummaryData = [];
-        let tierStatsData = [];
+    <!-- Actions / Uploads -->
+    <div class="flex items-center space-x-2">
+      <!-- Upload KiotViet -->
+      <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-400"></i>
+        <span id="labelKv" class="hidden sm:inline">1. Nạp KiotViet</span>
+        <input type="file" id="fileKv" accept=".xlsx, .xls" class="hidden">
+      </label>
 
-        // File Input Event Handlers
-        document.getElementById('fileKv').addEventListener('change', function(e) {
-            let file = e.target.files[0];
-            if (file) {
-                document.getElementById('labelKv').innerHTML = `<span class="font-bold text-blue-600">${file.name}</span>`;
-                let reader = new FileReader();
-                reader.onload = function(e) {
-                    let data = new Uint8Array(e.target.result);
-                    kvWorkbook = XLSX.read(data, {type: 'array'});
-                    checkReady();
-                };
-                reader.readAsArrayBuffer(file);
-            }
-        });
+      <!-- Upload DMS -->
+      <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+        <i data-lucide="database" class="w-4 h-4 text-blue-400"></i>
+        <span id="labelDms" class="hidden sm:inline">2. Nạp DMS</span>
+        <input type="file" id="fileDms" accept=".xlsx, .xls" class="hidden">
+      </label>
 
-        document.getElementById('fileDms').addEventListener('change', function(e) {
-            let file = e.target.files[0];
-            if (file) {
-                document.getElementById('labelDms').innerHTML = `<span class="font-bold text-indigo-600">${file.name}</span>`;
-                let reader = new FileReader();
-                reader.onload = function(e) {
-                    let data = new Uint8Array(e.target.result);
-                    dmsWorkbook = XLSX.read(data, {type: 'array'});
-                    checkReady();
-                };
-                reader.readAsArrayBuffer(file);
-            }
-        });
+      <!-- Run Button -->
+      <button id="btnRun" onclick="runMatchingPipeline()" disabled class="bg-slate-700 text-slate-400 text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-not-allowed transition">
+        <i data-lucide="zap" class="w-4 h-4"></i>
+        <span>Khớp dữ liệu</span>
+      </button>
 
-        function checkReady() {
-            if (kvWorkbook && dmsWorkbook) {
-                let btn = document.getElementById('btnRun');
-                btn.disabled = false;
-                btn.classList.remove('bg-slate-300', 'text-slate-500', 'cursor-not-allowed');
-                btn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'text-white', 'shadow-lg', 'cursor-pointer');
-            }
+      <!-- Export Excel -->
+      <button onclick="exportMasterExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow flex items-center gap-1.5 transition">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        <span class="font-bold">Xuất Excel Master</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN SPLIT WORKSPACE -->
+  <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+    
+    <!-- LEFT PANEL: CUSTOMER LIST (400px -> 450px) -->
+    <aside class="w-full md:w-[460px] bg-white border-r border-slate-200 flex flex-col shrink-0 z-10 shadow-lg md:shadow-none h-1/2 md:h-full">
+      
+      <!-- STATS STRIP -->
+      <div class="grid grid-cols-4 gap-1 p-2 bg-slate-50 border-b border-slate-200 text-center text-xs">
+        <div class="p-1 rounded bg-white border border-slate-200">
+          <div class="text-[10px] text-slate-500">Tổng KH</div>
+          <div id="statTotal" class="font-bold text-slate-800">0</div>
+        </div>
+        <div class="p-1 rounded bg-white border border-slate-200">
+          <div class="text-[10px] text-emerald-600">Đã có Map</div>
+          <div id="statMatched" class="font-bold text-emerald-600">0</div>
+        </div>
+        <div class="p-1 rounded bg-white border border-slate-200">
+          <div class="text-[10px] text-amber-600">Gợi ý</div>
+          <div id="statSuggest" class="font-bold text-amber-600">0</div>
+        </div>
+        <div class="p-1 rounded bg-white border border-slate-200">
+          <div class="text-[10px] text-rose-500">Chưa có</div>
+          <div id="statPending" class="font-bold text-rose-500">0</div>
+        </div>
+      </div>
+
+      <!-- TABS & FILTER -->
+      <div class="p-2 border-b border-slate-200 bg-white space-y-2 shrink-0">
+        <!-- Search Box -->
+        <div class="relative">
+          <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400"></i>
+          <input type="text" id="searchInput" oninput="filterCustomerList()" placeholder="Tìm theo tên quán, SĐT, mã đường (XC6, DB8...)" class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-100 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500">
+        </div>
+
+        <!-- 3 Functional Tabs -->
+        <div class="flex gap-1 text-[11px] font-medium bg-slate-100 p-1 rounded-lg">
+          <button onclick="changeTab('suggest')" id="tabBtnSuggest" class="flex-1 py-1 text-center rounded-md font-semibold text-amber-800 bg-white shadow-sm transition">
+            Gợi ý trùng (<span id="badgeSuggest">0</span>)
+          </button>
+          <button onclick="changeTab('pending')" id="tabBtnPending" class="flex-1 py-1 text-center rounded-md text-slate-600 hover:text-slate-900 transition">
+            Chưa có Map (<span id="badgePending">0</span>)
+          </button>
+          <button onclick="changeTab('matched')" id="tabBtnMatched" class="flex-1 py-1 text-center rounded-md text-slate-600 hover:text-slate-900 transition">
+            Đã có Map (<span id="badgeMatched">0</span>)
+          </button>
+        </div>
+      </div>
+
+      <!-- CUSTOMER LIST VIEW (VIRTUALIZED / CHUNKED FOR MAX PERFORMANCE) -->
+      <div id="customerListView" class="flex-1 overflow-y-auto divide-y divide-slate-100">
+        <div class="p-8 text-center text-xs text-slate-400">
+          <i data-lucide="folder-up" class="w-10 h-10 mx-auto text-slate-300 mb-2"></i>
+          Vui lòng nạp 2 file Excel KiotViet và DMS ở thanh công cụ phía trên để bắt đầu đối soát trực quan.
+        </div>
+      </div>
+
+      <!-- FOOTER DETAIL & QUICK MANUAL GPS INPUT -->
+      <div id="quickManualBar" class="p-2.5 bg-slate-900 text-white border-t border-slate-800 text-xs shrink-0 flex items-center justify-between gap-2">
+        <div class="flex-1 truncate">
+          <span class="text-slate-400">Đang chọn: </span>
+          <span id="selectedCustName" class="font-bold text-blue-300">Chưa chọn khách</span>
+        </div>
+        <button onclick="openZaloLinkModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded text-[11px] font-semibold flex items-center gap-1 shrink-0">
+          <i data-lucide="link" class="w-3.5 h-3.5"></i>
+          Dán Link Bản Đồ
+        </button>
+      </div>
+    </aside>
+
+    <!-- RIGHT PANEL: INTERACTIVE MAP & SURROUNDING DMS PINPOINTS -->
+    <section class="flex-1 flex flex-col relative h-1/2 md:h-full bg-slate-200">
+      
+      <!-- MAP OVERLAY BAR -->
+      <div class="absolute top-3 left-3 right-3 z-[1000] flex items-center justify-between pointer-events-none">
+        <div class="bg-white/95 backdrop-blur px-3 py-1.5 rounded-lg shadow-md border border-slate-200/80 pointer-events-auto flex items-center gap-2 text-xs">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="font-semibold text-slate-700" id="mapStatusText">Bản đồ vệ tinh & tuyến đường Bình Dương</span>
+        </div>
+        <div class="bg-white/95 backdrop-blur px-2.5 py-1.5 rounded-lg shadow-md border border-slate-200/80 pointer-events-auto flex items-center gap-2 text-xs">
+          <button onclick="locateBenCatCenter()" class="text-slate-600 hover:text-blue-600 font-medium flex items-center gap-1" title="Về trung tâm Bến Cát">
+            <i data-lucide="crosshair" class="w-3.5 h-3.5"></i> Về Bến Cát
+          </button>
+        </div>
+      </div>
+
+      <!-- THE MAP CANVAS CONTAINER -->
+      <div id="map" class="flex-1 w-full h-full"></div>
+
+      <!-- IN-MAP HELPER TOOLTIP -->
+      <div class="absolute bottom-3 left-3 right-3 z-[1000] pointer-events-none">
+        <div class="bg-slate-900/90 text-white text-[11px] px-3 py-2 rounded-xl backdrop-blur shadow-lg border border-slate-700/60 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="info" class="w-4 h-4 text-amber-400 shrink-0"></i>
+            <span>Mẹo duyệt map: Click vào ghim DMS bất kỳ trên bản đồ để gán trực tiếp tọa độ cho khách hàng KiotViet đang chọn.</span>
+          </div>
+          <span class="text-slate-400 text-[10px] hidden sm:inline">Tiles: CartoDB Positron</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: DÁN LINK BẢN ĐỒ / ZALO -->
+  <div id="zaloModal" class="fixed inset-0 bg-black/60 z-[2000] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+          <i data-lucide="navigation" class="w-4 h-4 text-blue-600"></i>
+          Gán tọa độ cho: <span id="modalCustName" class="text-blue-600 truncate"></span>
+        </h3>
+        <button onclick="closeZaloLinkModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-2 text-xs">
+        <label class="font-medium text-slate-700">Dán Link Google Maps / Link Zalo hoặc Tọa độ thẳng (Lat, Long):</label>
+        <textarea id="modalUrlInput" rows="3" placeholder="Ví dụ: https://maps.app.goo.gl/... hoặc https://goo.gl/maps/... hoặc 11.16892, 106.61245" class="w-full p-2.5 border rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500"></textarea>
+        <p class="text-[11px] text-slate-500">Hệ thống sẽ tự động bóc tách chuỗi tọa độ (Vĩ độ, Kinh độ) từ link rút gọn hoặc tin nhắn tài xế gửi qua Zalo.</p>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeZaloLinkModal()" class="px-3 py-1.5 rounded-lg border text-xs text-slate-600 hover:bg-slate-50">Hủy</button>
+        <button onclick="applyManualCoordinates()" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow">Xác nhận gán</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. KHỞI TẠO BẢN ĐỒ KHẮC PHỤC TRIỆT ĐỂ LỖI MẢNG XÁM / TRẮNG
+    // =========================================================================
+    let map = null;
+    let dmsLayerGroup = null;
+    let selectedMarkerGroup = null;
+    const DEFAULT_CENTER = [11.168, 106.612]; // Tâm Thị xã Bến Cát, Bình Dương
+
+    function initMap() {
+      // Khởi tạo Leaflet Map với tile CartoDB Positron cực nhẹ, mượt, không bị chặn referrer
+      map = L.map('map', {
+        center: DEFAULT_CENTER,
+        zoom: 13,
+        zoomControl: true,
+        preferCanvas: true // Vẽ bằng HTML5 Canvas tăng tốc độ khi render hàng ngàn điểm
+      });
+
+      // CartoDB Positron Tile Server - Ổn định và hiển thị đẹp trên mọi môi trường (Web / Vercel / File máy)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(map);
+
+      dmsLayerGroup = L.layerGroup().addTo(map);
+      selectedMarkerGroup = L.layerGroup().addTo(map);
+
+      // Khắc phục triệt để lỗi mảng xám / kích thước khung bản đồ (Invalidate Size)
+      setTimeout(() => { map.invalidateSize(); }, 300);
+      window.addEventListener('resize', () => { map.invalidateSize(); });
+    }
+
+    function locateBenCatCenter() {
+      if (map) {
+        map.setView(DEFAULT_CENTER, 13);
+        map.invalidateSize();
+      }
+    }
+
+    // =========================================================================
+    // 2. DATA STORES & TỪ ĐIỂN ĐỊA BÀN FMCG (BẾN CÁT / BÌNH DƯƠNG)
+    // =========================================================================
+    let kvList = [];        // Danh sách khách hàng KiotViet Unique
+    let dmsList = [];       // Danh sách điểm DMS (4.903 điểm)
+    let selectedCustId = null;
+    let currentTab = 'suggest'; // 'suggest' | 'pending' | 'matched'
+
+    const ROAD_REGEX = /(db\d+[a-z]?|xc\d+[a-z]?|dj\d+[a-z]?|da\d+[a-z]?|dc\d+[a-z]?|dd\d+[a-z]?|na\d+[a-z]?|nb\d+[a-z]?|nc\d+[a-z]?|ne\d+[a-z]?|n\d+[a-z]?|d\d+[a-z]?|dt\s*7\d+[a-z]?|dh\s*\d+[a-z]?|ql\s*1[34]|hl\s*\d+|rach bap|ben suc|minh hung|tan lap|an dien|an tay|my phuoc\s*[1234]?|thoi hoa|hoa loi|chanh phu hoa|phu an|lai uyen|lai hung|long nguyen|tru van tho|cay truong|thanh tuyen|thanh an|dinh hoa|hiep an|vinh phu)/gi;
+    const STOPWORDS = /(tap hoa|th|bach hoa|bh|dai ly|dl|quan|nha hang|nh|tiem|cua hang|ch|sri|mini|mart|co|chu|anh|chi|ba|ong|em|di|bac|nghi trua.*|khu pho|kp|ap|to|duong|phuong|xa|thi tran|ben cat|binh duong|bau bang|dau tieng|thuan an|thu dau mot)/gi;
+
+    function removeDiacritics(str) {
+      if (!str) return '';
+      return String(str).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    }
+
+    function cleanPhone(raw) {
+      if (!raw) return { p9: '', p7: '', std: '' };
+      let s = String(raw).split('.')[0].replace(/\D/g, '');
+      if (s.startsWith('84') && s.length >= 10) s = s.substring(2);
+      s = s.replace(/^0+/, ''); // Xóa số 0 thừa
+      if (s.length === 9) {
+        return { p9: s, p7: s.slice(-7), std: '0' + s };
+      } else if (s.length === 10 && s.startsWith('0')) {
+        return { p9: s.slice(1), p7: s.slice(-7), std: s };
+      } else if (s.length > 10) {
+        let p10 = s.slice(-10);
+        return { p9: p10.slice(1), p7: p10.slice(-7), std: p10 };
+      } else if (s.length >= 7) {
+        return { p9: '', p7: s.slice(-7), std: '0' + s };
+      }
+      return { p9: '', p7: '', std: '' };
+    }
+
+    function extractRoads(text) {
+      if (!text) return new Set();
+      let t = removeDiacritics(text).replace(/(dt|dh|ql|hl)\s+(\d+)/g, '$1$2').replace(/[^\w\s]/g, ' ');
+      let matches = t.match(ROAD_REGEX);
+      return new Set(matches ? matches.map(m => m.trim().toLowerCase()) : []);
+    }
+
+    function extractCoreName(text) {
+      if (!text) return '';
+      let s = removeDiacritics(text);
+      s = s.replace(/\(.*?\)|\[.*?\]/g, ' ').replace(/\d{1,2}h\d{0,2}/g, ' ');
+      s = s.replace(ROAD_REGEX, ' ').replace(/[^\w\s]/g, ' ').replace(STOPWORDS, ' ');
+      let tokens = s.split(/\s+/).filter(w => w.length > 1 || !isNaN(w));
+      return tokens.join(' ').trim();
+    }
+
+    function tokenSetSimilarity(str1, str2) {
+      if (!str1 || !str2) return 0;
+      let set1 = new Set(str1.split(/\s+/));
+      let set2 = new Set(str2.split(/\s+/));
+      let inter = new Set([...set1].filter(x => set2.has(x)));
+      let union = new Set([...set1, ...set2]);
+      if (union.size === 0) return 0;
+      return (inter.size / union.size) * 100;
+    }
+
+    // =========================================================================
+    // 3. FILE UPLOADS & TIỀN XỬ LÝ DỮ LIỆU
+    // =========================================================================
+    let kvWorkbookRaw = null;
+    let dmsWorkbookRaw = null;
+
+    document.getElementById('fileKv').addEventListener('change', function(e) {
+      let file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('labelKv').innerText = file.name.substring(0, 15) + '...';
+      let reader = new FileReader();
+      reader.onload = function(evt) {
+        let data = new Uint8Array(evt.target.result);
+        kvWorkbookRaw = XLSX.read(data, { type: 'array' });
+        checkCanRun();
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    document.getElementById('fileDms').addEventListener('change', function(e) {
+      let file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('labelDms').innerText = file.name.substring(0, 15) + '...';
+      let reader = new FileReader();
+      reader.onload = function(evt) {
+        let data = new Uint8Array(evt.target.result);
+        dmsWorkbookRaw = XLSX.read(data, { type: 'array' });
+        checkCanRun();
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    function checkCanRun() {
+      if (kvWorkbookRaw && dmsWorkbookRaw) {
+        let btn = document.getElementById('btnRun');
+        btn.disabled = false;
+        btn.className = "bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition cursor-pointer";
+      }
+    }
+
+    // =========================================================================
+    // 4. PIPELINE ĐỐI SOÁT & TỐI ƯU HIỆU NĂNG KHÔNG GÂY ĐƠ TRÌNH DUYỆT
+    // =========================================================================
+    function runMatchingPipeline() {
+      document.getElementById('mapStatusText').innerText = "Đang xử lý dữ liệu và dựng bản đồ...";
+
+      // 1. Đọc DMS Sheet
+      let dmsSheet = dmsWorkbookRaw.Sheets[dmsWorkbookRaw.SheetNames[0]];
+      let dmsRawRows = XLSX.utils.sheet_to_json(dmsSheet);
+      dmsList = [];
+      let dmsP9Map = {};
+      let dmsP7Map = {};
+
+      dmsRawRows.forEach(row => {
+        let lat = parseFloat(row['La'] || row['Lat'] || row['Vĩ độ']);
+        let lon = parseFloat(row['Long'] || row['Lon'] || row['Kinh độ']);
+        if (isNaN(lat) || isNaN(lon)) return;
+
+        let code = String(row['Mã khách hàng'] || row['Mã KH'] || row['CD'] || '');
+        let name = String(row['Tên khách hàng'] || row['Tên KH'] || '');
+        let addr = String(row['Địa chỉ'] || '');
+        let phone = row['SDT'] || row['Điện thoại'] || '';
+        let { p9, p7, std } = cleanPhone(phone);
+        let coreName = extractCoreName(name);
+        let roads = extractRoads(name + ' ' + addr);
+
+        let dmsItem = {
+          code, name, addr, stdPhone: std, lat, lon, p9, p7, coreName, roads
+        };
+        dmsList.push(dmsItem);
+
+        if (p9) {
+          if (!dmsP9Map[p9]) dmsP9Map[p9] = [];
+          dmsP9Map[p9].push(dmsItem);
+        }
+        if (p7) {
+          if (!dmsP7Map[p7]) dmsP7Map[p7] = [];
+          dmsP7Map[p7].push(dmsItem);
+        }
+      });
+
+      // 2. Đọc KiotViet Sheet (Gộp Unique theo Mã khách hàng)
+      let kvSheet = kvWorkbookRaw.Sheets[kvWorkbookRaw.SheetNames[0]];
+      let kvRawRows = XLSX.utils.sheet_to_json(kvSheet);
+      let kvMap = new Map();
+
+      kvRawRows.forEach(row => {
+        let id = row['Mã khách hàng'] || row['Mã KH'];
+        if (!id) return;
+        let phone = row['Điện thoại'] || row['Điện thoại (Người nhận)'];
+        let addr = row['Địa chỉ (Khách hàng)'] || row['Địa chỉ (Người nhận)'];
+        let score = (phone ? 2 : 0) + (addr ? 1 : 0);
+        if (!kvMap.has(id) || kvMap.get(id).score < score) {
+          kvMap.set(id, { row, score });
+        }
+      });
+
+      let uniqueKvRows = Array.from(kvMap.values()).map(v => v.row);
+
+      // 3. Khớp 4 tầng cho từng Khách Hàng KiotViet
+      kvList = [];
+
+      uniqueKvRows.forEach(kv => {
+        let id = kv['Mã khách hàng'] || kv['Mã KH'];
+        let name = String(kv['Tên khách hàng'] || '');
+        let addr = String(kv['Địa chỉ (Khách hàng)'] || '');
+        let phoneRaw = kv['Điện thoại'] || '';
+        let { p9, p7, std } = cleanPhone(phoneRaw);
+        let coreName = extractCoreName(name);
+        let fullText = name + ' ' + addr;
+        let roads = extractRoads(fullText);
+
+        let matched = null;
+        let tier = 'Chưa có Map';
+        let status = 'pending'; // 'matched' | 'suggest' | 'pending'
+        let suggestedDms = null;
+        let matchScore = 0;
+
+        // Tầng 1: Tọa độ Regex sẵn
+        let gpsMatch = fullText.match(/(1[0-2]\.\d{4,8})\s*[,;/\-\s]\s*(10[5-7]\.\d{4,8})/);
+        if (gpsMatch) {
+          matched = {
+            lat: parseFloat(gpsMatch[1]),
+            lon: parseFloat(gpsMatch[2]),
+            addr: addr,
+            name: name,
+            code: 'Regex GPS'
+          };
+          tier = 'Tầng 1: Tọa độ có sẵn trong text';
+          status = 'matched';
         }
 
-        // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI & THUẬT TOÁN ---
-        function removeDiacritics(str) {
-            if (!str) return "";
-            return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        // Tầng 2: 9 số cuối SĐT
+        if (!matched && p9 && dmsP9Map[p9]) {
+          let cands = dmsP9Map[p9];
+          matched = cands[0];
+          tier = 'Tầng 2: Khớp tuyệt đối 9 số cuối SĐT';
+          status = 'matched';
         }
 
-        const STOPWORDS = /\b(tap hoa|th|bach hoa|bh|dai ly|dl|quan|nha hang|nh|tiem|cua hang|ch|sri|mini|mart|co|chu|anh|chi|ba|ong|em|di|bac|nghi trua.*|khu pho|kp|ap|to|duong|phuong|xa|thi tran|ben cat|binh duong|bau bang|dau tieng|thuan an|thu dau mot)\b/g;
-        const PROVINCES = ['ha noi', 'thanh hoa', 'nghe an', 'ha tinh', 'quang binh', 'quang tri', 'nam dinh', 'thai binh', 'hai phong', 'phu tho', 'bac giang', 'dong nai', 'long an', 'tien giang', 'ben tre', 'vinh long', 'tra vinh', 'can tho', 'an giang', 'kien giang', 'ca mau', 'bac lieu', 'soc trang', 'hau giang', 'dong thap', 'tay ninh', 'binh phuoc', 'lam dong', 'dak lak', 'gia lai'];
+        // Tầng 3: 7 số cuối SĐT + Tên
+        if (!matched && p7 && dmsP7Map[p7]) {
+          let cands = dmsP7Map[p7];
+          let best = cands.reduce((prev, curr) => {
+            let sim = tokenSetSimilarity(coreName, curr.coreName);
+            return sim > prev.sim ? { item: curr, sim } : prev;
+          }, { item: cands[0], sim: 0 });
+
+          if (best.sim >= 60) {
+            matched = best.item;
+            tier = `Tầng 3: Khớp 7 số SĐT + Tên (${Math.round(best.sim)}%)`;
+            status = 'matched';
+          }
+        }
+
+        // Tầng 4: Fuzzy Matching Tên + Tuyến Đường
+        if (!matched && coreName) {
+          let bestCand = null;
+          let bestSim = 0;
+
+          dmsList.forEach(d => {
+            if (!d.coreName) return;
+            let commonRoads = new Set([...roads].filter(r => d.roads.has(r)));
+            if (commonRoads.size > 0) {
+              let nameSim = tokenSetSimilarity(coreName, d.coreName);
+              let combined = (nameSim * 0.8) + 20.0; // Bonus khi trùng mã đường
+              if (combined > bestSim) {
+                bestSim = combined;
+                bestCand = d;
+              }
+            }
+          });
+
+          if (bestCand && bestSim >= 80) {
+            matched = bestCand;
+            tier = `Tầng 4: Trùng Tên + Mã đường (${Math.round(bestSim)}%)`;
+            status = 'matched';
+          } else if (bestCand && bestSim >= 65) {
+            suggestedDms = bestCand;
+            matchScore = Math.round(bestSim);
+            tier = `Gợi ý Tầng 4: Trùng đường & tên (${matchScore}%)`;
+            status = 'suggest';
+          }
+        }
+
+        kvList.push({
+          id,
+          name,
+          addr,
+          phone: std || phoneRaw,
+          coreName,
+          roads,
+          status, // 'matched' | 'suggest' | 'pending'
+          tier,
+          lat: matched ? matched.lat : null,
+          lon: matched ? matched.lon : null,
+          matchedAddr: matched ? matched.addr : addr,
+          suggestedDms: suggestedDms,
+          matchScore: matchScore
+        });
+      });
+
+      // 4. Render Markers lên Map & Thống kê
+      renderDmsMarkersOnMap();
+      updateStatistics();
+      renderCustomerList();
+
+      document.getElementById('mapStatusText').innerText = `Đã nạp ${dmsList.length} điểm DMS & ${kvList.length} KH KiotViet`;
+      lucide.createIcons();
+    }
+
+    // =========================================================================
+    // 5. HIỂN THỊ BẢN ĐỒ & SỰ KIỆN CLICK GHIM DMS (ĐỒNG BỘ 2 CHIỀU)
+    // =========================================================================
+    function renderDmsMarkersOnMap() {
+      if (!map) return;
+      dmsLayerGroup.clearLayers();
+
+      // Giới hạn hiển thị hoặc dùng CircleMarker nhẹ để bản đồ chạy mượt 60fps
+      dmsList.forEach(d => {
+        let marker = L.circleMarker([d.lat, d.lon], {
+          radius: 5,
+          fillColor: '#3b82f6',
+          color: '#1d4ed8',
+          weight: 1,
+          opacity: 0.9,
+          fillOpacity: 0.7
+        });
+
+        marker.bindPopup(`
+          <div class="text-xs space-y-1">
+            <div class="font-bold text-slate-800">${d.name}</div>
+            <div class="text-slate-500">${d.addr}</div>
+            <div class="text-blue-600 font-mono">SĐT: ${d.stdPhone || 'Không có'}</div>
+            <div class="text-[10px] text-slate-400 font-mono">${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}</div>
+            <button onclick="assignDmsToSelected('${d.code}')" class="mt-2 w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-1 px-2 rounded text-[11px] transition shadow">
+              Gán tọa độ này cho KH KiotViet
+            </button>
+          </div>
+        `);
+
+        dmsLayerGroup.addLayer(marker);
+      });
+
+      map.invalidateSize();
+    }
+
+    // Gán trực tiếp điểm DMS khi click trên Popup bản đồ
+    window.assignDmsToSelected = function(dmsCode) {
+      if (!selectedCustId) {
+        alert("Vui lòng chọn 1 Khách hàng KiotViet ở danh sách bên trái trước!");
+        return;
+      }
+      let dms = dmsList.find(d => d.code === dmsCode);
+      let kv = kvList.find(k => k.id === selectedCustId);
+      if (dms && kv) {
+        kv.lat = dms.lat;
+        kv.lon = dms.lon;
+        kv.matchedAddr = dms.addr;
+        kv.status = 'matched';
+        kv.tier = 'Gán thủ công từ Bản Đồ';
         
-        const ROAD_REGEX = /\b(db\d+[a-z]?|xc\d+[a-z]?|dj\d+[a-z]?|da\d+[a-z]?|dc\d+[a-z]?|dd\d+[a-z]?|na\d+[a-z]?|nb\d+[a-z]?|nc\d+[a-z]?|ne\d+[a-z]?|n\d+[a-z]?|d\d+[a-z]?|dt\s*7\d+[a-z]?|dh\s*\d+[a-z]?|ql\s*1[34]|hl\s*\d+|rach bap|ben suc|minh hung|tan lap|an dien|an tay|my phuoc\s*[1234]?|thoi hoa|hoa loi|chanh phu hoa|phu an|lai uyen|lai hung|long nguyen|tru van tho|cay truong|thanh tuyen|thanh an|dinh hoa|hiep an|vinh phu)\b/g;
+        map.closePopup();
+        updateStatistics();
+        renderCustomerList();
+        selectCustomer(kv.id);
+      }
+    };
 
-        function extractGps(text) {
-            if (!text) return [null, null];
-            let match = String(text).match(/(1[0-2]\.\d{4,8})\s*[,;/\-\s]\s*(10[5-7]\.\d{4,8})/);
-            if (match) return [parseFloat(match[1]), parseFloat(match[2])];
-            return [null, null];
+    // =========================================================================
+    // 6. GIAO DIỆN DANH SÁCH & HÀM DUYỆT NHANH TỐI ƯU (KHÔNG TREO TRÌNH DUYỆT)
+    // =========================================================================
+    function changeTab(tab) {
+      currentTab = tab;
+      document.getElementById('tabBtnSuggest').className = tab === 'suggest' ? "flex-1 py-1 text-center rounded-md font-semibold text-amber-800 bg-white shadow-sm transition" : "flex-1 py-1 text-center rounded-md text-slate-600 hover:text-slate-900 transition";
+      document.getElementById('tabBtnPending').className = tab === 'pending' ? "flex-1 py-1 text-center rounded-md font-semibold text-rose-800 bg-white shadow-sm transition" : "flex-1 py-1 text-center rounded-md text-slate-600 hover:text-slate-900 transition";
+      document.getElementById('tabBtnMatched').className = tab === 'matched' ? "flex-1 py-1 text-center rounded-md font-semibold text-emerald-800 bg-white shadow-sm transition" : "flex-1 py-1 text-center rounded-md text-slate-600 hover:text-slate-900 transition";
+      renderCustomerList();
+    }
+
+    function filterCustomerList() {
+      renderCustomerList();
+    }
+
+    function renderCustomerList() {
+      let query = removeDiacritics(document.getElementById('searchInput').value.trim());
+      let filtered = kvList.filter(k => {
+        let matchTab = (k.status === currentTab);
+        if (!matchTab) return false;
+        if (!query) return true;
+        let matchText = removeDiacritics(k.name + ' ' + k.id + ' ' + k.phone + ' ' + k.addr);
+        return matchText.includes(query);
+      });
+
+      let container = document.getElementById('customerListView');
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">Không có khách hàng nào trong mục này.</div>`;
+        return;
+      }
+
+      // Giới hạn render 100 phần tử đầu tiên để chống đơ DOM, cuộn đến đâu tải đến đó
+      let html = filtered.slice(0, 100).map(k => {
+        let isSelected = (k.id === selectedCustId);
+        let borderClass = isSelected ? "border-l-4 border-blue-600 bg-blue-50/50" : "hover:bg-slate-50";
+
+        let badge = "";
+        let actionBtn = "";
+
+        if (k.status === 'suggest' && k.suggestedDms) {
+          badge = `<span class="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">Khớp ${k.matchScore}%</span>`;
+          actionBtn = `
+            <button onclick="approveSuggest(event, '${k.id}')" class="bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow transition flex items-center gap-1">
+              <i data-lucide="check" class="w-3 h-3"></i> Duyệt gộp
+            </button>
+          `;
+        } else if (k.status === 'matched') {
+          badge = `<span class="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-semibold"><i data-lucide="check-check" class="w-3 h-3 inline"></i> Đã có Map</span>`;
+        } else {
+          badge = `<span class="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-semibold">Chưa có Map</span>`;
         }
 
-        function cleanPhone(phone) {
-            if (!phone) return ["", "", ""];
-            let s = String(phone).split('.')[0].replace(/\D/g, '');
-            if (s.startsWith('84') && s.length >= 10) s = s.substring(2);
-            s = s.replace(/^0+/, '');
-            if (s.length >= 9) {
-                return [s.slice(-9), s.slice(-7), '0' + s.slice(-9)];
-            } else if (s.length >= 7) {
-                return ["", s.slice(-7), '0' + s];
-            }
-            return ["", "", ""];
-        }
+        return `
+          <div onclick="selectCustomer('${k.id}')" class="p-3 cursor-pointer transition ${borderClass}">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs font-bold text-slate-900 truncate">${k.name}</span>
+                  ${badge}
+                </div>
+                <div class="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
+                  <span>Mã: <strong class="text-slate-700 font-mono">${k.id}</strong></span>
+                  <span>SĐT: <strong class="text-blue-600 font-mono">${k.phone || 'Trống'}</strong></span>
+                </div>
+                <div class="text-[11px] text-slate-400 truncate mt-0.5">${k.addr}</div>
+                
+                ${k.status === 'suggest' && k.suggestedDms ? `
+                  <div class="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200 text-[11px] text-amber-900 flex justify-between items-center">
+                    <div>
+                      <div class="font-semibold text-amber-800">DMS Gợi ý: ${k.suggestedDms.name}</div>
+                      <div class="text-[10px] text-amber-600">${k.suggestedDms.addr}</div>
+                    </div>
+                    ${actionBtn}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
 
-        function extractRoads(text) {
-            if (!text) return new Set();
-            let t = removeDiacritics(text);
-            t = t.replace(/\b(dt|dh|ql|hl)\s+(\d+)/g, '$1$2').replace(/[^\w\s]/g, ' ');
-            let matches = t.match(ROAD_REGEX);
-            return new Set(matches ? matches.map(m => m.trim()) : []);
-        }
+      container.innerHTML = html;
+      lucide.createIcons();
+    }
 
-        function extractCoreName(name) {
-            if (!name) return "";
-            let s = removeDiacritics(name);
-            s = s.replace(/\(.*?\)|\[.*?\]/g, ' ').replace(/\b\d{1,2}h\d{0,2}\b/g, ' ');
-            s = s.replace(ROAD_REGEX, ' ').replace(/[^\w\s]/g, ' ').replace(STOPWORDS, ' ');
-            let tokens = s.split(/\s+/).filter(w => w.length > 1 || !isNaN(w));
-            let core = tokens.join(' ').trim();
-            if (!core) {
-                let fb = removeDiacritics(name).replace(/\b(tap hoa|th|bach hoa|dai ly|tiem|quan)\b/g, ' ').replace(/[^\w\s]/g, ' ');
-                core = fb.split(/\s+/).filter(Boolean).join(' ').trim();
-            }
-            return core;
-        }
+    // Chọn khách hàng & tự động Zoom Map mượt mà
+    window.selectCustomer = function(id) {
+      selectedCustId = id;
+      let k = kvList.find(item => item.id === id);
+      if (!k) return;
 
-        function tokenSetRatio(str1, str2) {
-            if (!str1 || !str2) return 0;
-            let set1 = new Set(str1.split(/\s+/));
-            let set2 = new Set(str2.split(/\s+/));
-            let intersection = new Set([...set1].filter(x => set2.has(x)));
-            let union = new Set([...set1, ...set2]);
-            if (union.size === 0) return 0;
-            return (intersection.size / union.size) * 100;
-        }
+      document.getElementById('selectedCustName').innerText = `${k.name} (${k.id})`;
+      selectedMarkerGroup.clearLayers();
 
-        function isValidBdAddress(addr) {
-            if (!addr || String(addr).length < 5) return false;
-            let s = removeDiacritics(addr);
-            if (s.includes('binh duong') || extractRoads(s).size > 0) return true;
-            for (let p of PROVINCES) {
-                if (s.includes(p)) return false;
-            }
-            return true;
-        }
+      // Nếu đã có tọa độ hoặc gợi ý tọa độ -> Zoom map vào đó
+      let targetLat = k.lat || (k.suggestedDms ? k.suggestedDms.lat : null);
+      let targetLon = k.lon || (k.suggestedDms ? k.suggestedDms.lon : null);
 
-        // --- CHẠY PIPELINE ĐỐI SOÁT ---
-        function runMatchingPipeline() {
-            let kvSheetName = kvWorkbook.SheetNames[0];
-            let kvData = XLSX.utils.sheet_to_json(kvWorkbook.Sheets[kvSheetName]);
-            
-            let dmsSheetName = dmsWorkbook.SheetNames[0];
-            let dmsData = XLSX.utils.sheet_to_json(dmsWorkbook.Sheets[dmsSheetName]);
+      if (targetLat && targetLon && map) {
+        map.flyTo([targetLat, targetLon], 16, { duration: 0.8 });
 
-            // Auto-detect columns
-            if (kvData.length === 0 || dmsData.length === 0) {
-                alert("File Excel trống hoặc không đọc được dữ liệu!");
-                return;
-            }
+        // Tạo Ghim nổi bật màu đỏ to để NPP nhận diện quán đang chọn
+        let targetMarker = L.marker([targetLat, targetLon], {
+          icon: L.divIcon({
+            className: 'custom-pin',
+            html: `
+              <div class="relative flex items-center justify-center">
+                <span class="animate-ping absolute inline-flex h-8 w-8 rounded-full bg-rose-400 opacity-75"></span>
+                <div class="w-6 h-6 bg-rose-600 rounded-full border-2 border-white shadow-xl flex items-center justify-center text-white text-[10px] font-bold">★</div>
+              </div>
+            `,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          })
+        }).bindPopup(`<b>${k.name}</b><br><span class="text-xs text-slate-500">${k.matchedAddr || k.addr}</span>`).openPopup();
 
-            let kvCols = Object.keys(kvData[0]);
-            let dmsCols = Object.keys(dmsData[0]);
+        selectedMarkerGroup.addLayer(targetMarker);
+      }
 
-            let c_kv_id = kvCols.find(c => /mã|id/i.test(c)) || kvCols[0];
-            let c_kv_name = kvCols.find(c => /tên.*kh|khách hàng/i.test(c)) || kvCols[1];
-            let c_kv_phone = kvCols.find(c => /sđt|điện thoại|phone/i.test(c)) || kvCols[2];
-            let c_kv_addr = kvCols.find(c => /địa chỉ|addr/i.test(c)) || kvCols[3];
+      renderCustomerList();
+    };
 
-            let c_dms_id = dmsCols.find(c => /mã|id/i.test(c)) || dmsCols[0];
-            let c_dms_name = dmsCols.find(c => /tên.*kh|khách hàng/i.test(c)) || dmsCols[1];
-            let c_dms_addr = dmsCols.find(c => /địa chỉ|addr/i.test(c)) || dmsCols[2];
-            let c_dms_phone = dmsCols.find(c => /sđt|điện thoại|phone/i.test(c)) || dmsCols[3];
-            let c_dms_lat = dmsCols.find(c => /la|vĩ độ/i.test(c)) || dmsCols[4];
-            let c_dms_lon = dmsCols.find(c => /long|kinh độ/i.test(c)) || dmsCols[5];
+    // Duyệt nhanh điểm gợi ý (Không gây lag nhờ cập nhật trực tiếp state)
+    window.approveSuggest = function(event, id) {
+      event.stopPropagation();
+      let k = kvList.find(item => item.id === id);
+      if (k && k.suggestedDms) {
+        k.lat = k.suggestedDms.lat;
+        k.lon = k.suggestedDms.lon;
+        k.matchedAddr = k.suggestedDms.addr;
+        k.status = 'matched';
+        k.tier = 'Duyệt gộp thủ công từ gợi ý';
+        k.suggestedDms = null;
 
-            // Deduplication KiotViet
-            let kvMap = new Map();
-            kvData.forEach(row => {
-                let id = row[c_kv_id];
-                if (!id) return;
-                let phone = row[c_kv_phone];
-                let addr = row[c_kv_addr];
-                let score = (phone ? 2 : 0) + (addr ? 1 : 0);
-                if (!kvMap.has(id) || kvMap.get(id).score < score) {
-                    kvMap.set(id, { row, score });
-                }
-            });
+        updateStatistics();
+        renderCustomerList();
+        selectCustomer(k.id);
+      }
+    };
 
-            let uniqueKv = Array.from(kvMap.values()).map(item => item.row);
+    function updateStatistics() {
+      let total = kvList.length;
+      let matched = kvList.filter(k => k.status === 'matched').length;
+      let suggest = kvList.filter(k => k.status === 'suggest').length;
+      let pending = kvList.filter(k => k.status === 'pending').length;
 
-            // Preprocess DMS
-            let dmsProcessed = [];
-            let dmsP9Map = {};
-            let dmsP7Map = {};
+      document.getElementById('statTotal').innerText = total;
+      document.getElementById('statMatched').innerText = matched;
+      document.getElementById('statSuggest').innerText = suggest;
+      document.getElementById('statPending').innerText = pending;
 
-            dmsData.forEach(row => {
-                let lat = parseFloat(row[c_dms_lat]);
-                let lon = parseFloat(row[c_dms_lon]);
-                if (isNaN(lat) || isNaN(lon)) return;
+      document.getElementById('badgeSuggest').innerText = suggest;
+      document.getElementById('badgePending').innerText = pending;
+      document.getElementById('badgeMatched').innerText = matched;
+    }
 
-                let phone = row[c_dms_phone];
-                let [p9, p7, std_phone] = cleanPhone(phone);
-                let name = String(row[c_dms_name] || '');
-                let addr = String(row[c_dms_addr] || '');
-                let core_name = extractCoreName(name);
-                let full_text = name + ' ' + addr;
-                let roads = extractRoads(full_text);
+    // =========================================================================
+    // 7. GIẢI MÃ LINK ZALO / GOOGLE MAPS RÚT GỌN RA TỌA ĐỘ GPS
+    // =========================================================================
+    function openZaloLinkModal() {
+      if (!selectedCustId) {
+        alert("Vui lòng click chọn 1 Khách hàng KiotViet trong danh sách trước!");
+        return;
+      }
+      let k = kvList.find(item => item.id === selectedCustId);
+      document.getElementById('modalCustName').innerText = k.name;
+      document.getElementById('modalUrlInput').value = '';
+      document.getElementById('zaloModal').classList.remove('hidden');
+    }
 
-                let dmsObj = {
-                    id: row[c_dms_id],
-                    name: name,
-                    addr: addr,
-                    phone: phone,
-                    std_phone: std_phone,
-                    lat: lat,
-                    lon: lon,
-                    p9: p9,
-                    p7: p7,
-                    core_name: core_name,
-                    roads: roads
-                };
+    function closeZaloLinkModal() {
+      document.getElementById('zaloModal').classList.add('hidden');
+    }
 
-                dmsProcessed.push(dmsObj);
-                if (p9) {
-                    if (!dmsP9Map[p9]) dmsP9Map[p9] = [];
-                    dmsP9Map[p9].push(dmsObj);
-                }
-                if (p7) {
-                    if (!dmsP7Map[p7]) dmsP7Map[p7] = [];
-                    dmsP7Map[p7].push(dmsObj);
-                }
-            });
+    function applyManualCoordinates() {
+      let input = document.getElementById('modalUrlInput').value.trim();
+      if (!input) return;
 
-            let results = [];
-            let reviewList = [];
+      let k = kvList.find(item => item.id === selectedCustId);
+      if (!k) return;
 
-            uniqueKv.forEach(kv => {
-                let kvId = kv[c_kv_id];
-                let kvName = String(kv[c_kv_name] || '');
-                let kvAddr = String(kv[c_kv_addr] || '');
-                let kvPhoneRaw = kv[c_kv_phone];
+      // Regex bóc tách tọa độ từ chuỗi hoặc link google maps
+      // Hỗ trợ dạng @11.168,106.612 hoặc ?q=11.168,106.612 hoặc số thuần
+      let regex = /(1[0-2]\.\d{4,8})\s*[,;/\-\s]\s*(10[5-7]\.\d{4,8})/;
+      let match = input.match(regex);
 
-                let [p9, p7, kvStdPhone] = cleanPhone(kvPhoneRaw);
-                let kvCoreName = extractCoreName(kvName);
-                let kvFullText = kvName + ' ' + kvAddr;
-                let kvRoads = extractRoads(kvFullText);
+      if (match) {
+        let lat = parseFloat(match[1]);
+        let lon = parseFloat(match[2]);
 
-                let matchedDms = null;
-                let matchTier = "Chưa khớp";
-                let matchScore = 0;
-                let latOut = null, lonOut = null;
-                let needReview = false;
+        k.lat = lat;
+        k.lon = lon;
+        k.status = 'matched';
+        k.tier = 'Gán qua Link Zalo / Tọa độ';
+        k.suggestedDms = null;
 
-                // Tầng 1: GPS in text
-                let [latReg, lonReg] = extractGps(kvFullText);
-                if (latReg !== null && lonReg !== null) {
-                    latOut = latReg;
-                    lonOut = lonReg;
-                    matchTier = "Tầng 1: Tọa độ ghi chú sẵn (Regex)";
-                    matchScore = 100;
-                }
+        closeZaloLinkModal();
+        updateStatistics();
+        renderCustomerList();
+        selectCustomer(k.id);
+        alert(`Đã gán thành công tọa độ [${lat}, ${lon}] cho quán ${k.name}!`);
+      } else {
+        alert("Không tìm thấy chuỗi tọa độ hợp lệ! Vui lòng dán link có chứa tọa độ hoặc nhập dạng: 11.xxxx, 106.xxxx");
+      }
+    }
 
-                // Tầng 2: 9 digits phone
-                if (!latOut && p9 && dmsP9Map[p9]) {
-                    let candidates = dmsP9Map[p9];
-                    if (candidates.length === 1) {
-                        matchedDms = candidates[0];
-                        matchTier = "Tầng 2: Khớp 9 số cuối SĐT";
-                        matchScore = 100;
-                    } else {
-                        let best = candidates.reduce((max, c) => {
-                            let sim = tokenSetRatio(kvCoreName, c.core_name);
-                            return sim > max.sim ? {c, sim} : max;
-                        }, {c: candidates[0], sim: 0});
-                        matchedDms = best.c;
-                        matchTier = "Tầng 2: Khớp 9 số SĐT (Nhiều điểm)";
-                        matchScore = best.sim;
-                    }
-                }
+    // =========================================================================
+    // 8. XUẤT FILE EXCEL MASTER DATA CHUẨN KIOTVIET (3 SHEETS)
+    // =========================================================================
+    function exportMasterExcel() {
+      if (kvList.length === 0) {
+        alert("Chưa có dữ liệu để xuất! Vui lòng nạp 2 file Excel trước.");
+        return;
+      }
 
-                // Tầng 3: 7 digits phone + name
-                if (!latOut && !matchedDms && p7 && dmsP7Map[p7]) {
-                    let candidates = dmsP7Map[p7];
-                    let best = null;
-                    let bestSim = 0;
-                    candidates.forEach(c => {
-                        let sim = tokenSetRatio(kvCoreName, c.core_name);
-                        if (sim > bestSim) {
-                            bestSim = sim;
-                            best = c;
-                        }
-                    });
-                    if (best && bestSim >= 65) {
-                        matchedDms = best;
-                        matchTier = `Tầng 3: Khớp 7 số SĐT + Tên (${Math.round(bestSim)}%)`;
-                        matchScore = bestSim;
-                        if (bestSim < 80) needReview = true;
-                    }
-                }
+      let masterRows = kvList.map(k => ({
+        'Mã khách hàng KiotViet': k.id,
+        'Tên khách hàng KiotViet': k.name,
+        'SĐT chuẩn': k.phone,
+        'Vĩ độ (Lat)': k.lat,
+        'Kinh độ (Long)': k.lon,
+        'Tọa độ GPS': (k.lat && k.lon) ? `${k.lat}, ${k.lon}` : '',
+        'Địa chỉ thực tế tại Bình Dương': k.matchedAddr || k.addr,
+        'Trạng thái': k.status === 'matched' ? 'Đã có GPS' : 'Chưa có GPS',
+        'Loại cơ chế khớp': k.tier
+      }));
 
-                // Tầng 4: Fuzzy matching + roads
-                if (!latOut && !matchedDms && kvCoreName) {
-                    let bestCand = null;
-                    let bestCombined = 0;
-                    let bestTierDesc = "";
+      let reviewRows = kvList.filter(k => k.status === 'suggest' || k.status === 'pending').map(k => ({
+        'Mã KH KiotViet': k.id,
+        'Tên KH KiotViet': k.name,
+        'SĐT': k.phone,
+        'Địa chỉ KiotViet': k.addr,
+        'Trạng thái': k.status === 'suggest' ? 'Cần duyệt gợi ý' : 'Chưa có tọa độ',
+        'DMS Gợi ý': k.suggestedDms ? k.suggestedDms.name : '',
+        'Địa chỉ DMS Gợi ý': k.suggestedDms ? k.suggestedDms.addr : ''
+      }));
 
-                    dmsProcessed.forEach(c => {
-                        if (!c.core_name) return;
-                        let commonRoads = new Set([...kvRoads].filter(x => c.roads.has(x)));
-                        if (commonRoads.size > 0) {
-                            let nameSim = tokenSetRatio(kvCoreName, c.core_name);
-                            let combined = (nameSim * 0.8) + 20.0;
-                            if (combined > bestCombined) {
-                                bestCombined = combined;
-                                bestCand = c;
-                                let rStr = Array.from(commonRoads).join(', ').toUpperCase();
-                                bestTierDesc = `Tầng 4: Khớp Tên + Tuyến đường [${rStr}] (${Math.round(combined)}%)`;
-                            }
-                        }
-                    });
+      let summaryRows = [
+        { 'Chỉ số': 'Tổng số KH KiotViet', 'Giá trị': kvList.length },
+        { 'Chỉ số': 'Đã có tọa độ GPS', 'Giá trị': kvList.filter(k => k.status === 'matched').length },
+        { 'Chỉ số': 'Chưa có tọa độ GPS', 'Giá trị': kvList.filter(k => k.status !== 'matched').length },
+        { 'Chỉ số': 'Tỷ lệ hoàn thành (%)', 'Giá trị': ((kvList.filter(k => k.status === 'matched').length / kvList.length) * 100).toFixed(2) + '%' }
+      ];
 
-                    if (bestCand && bestCombined >= 80) {
-                        matchedDms = bestCand;
-                        matchTier = bestTierDesc;
-                        matchScore = Math.round(bestCombined);
-                        if (bestCombined < 86) needReview = true;
-                    } else if (bestCand && bestCombined >= 70) {
-                        needReview = true;
-                        reviewList.push({
-                            'Mã KH KiotViet': kvId,
-                            'Tên KH KiotViet': kvName,
-                            'Tên Cốt Lõi (KV)': kvCoreName,
-                            'SĐT KiotViet': kvStdPhone,
-                            'Địa chỉ KiotViet': kvAddr,
-                            'Mã DMS Gợi ý': bestCand.id,
-                            'Tên DMS Gợi ý': bestCand.name,
-                            'Tọa độ Gợi ý': `${bestCand.lat}, ${bestCand.lon}`,
-                            'Điểm tương đồng (%)': Math.round(bestCombined),
-                            'Lý do nghi ngờ': bestTierDesc
-                        });
-                    }
-                }
+      let wb = XLSX.utils.book_new();
+      let ws1 = XLSX.utils.json_to_sheet(masterRows);
+      let ws2 = XLSX.utils.json_to_sheet(reviewRows);
+      let ws3 = XLSX.utils.json_to_sheet(summaryRows);
 
-                let finalPhone = kvStdPhone;
-                let finalAddr = kvAddr;
-                let dmsCode = "", dmsName = "";
+      XLSX.utils.book_append_sheet(wb, ws1, "1_Master_Data_KiotViet");
+      XLSX.utils.book_append_sheet(wb, ws2, "2_Can_Xu_Ly_Tiep");
+      XLSX.utils.book_append_sheet(wb, ws3, "3_Thong_Ke");
 
-                if (matchedDms) {
-                    latOut = matchedDms.lat;
-                    lonOut = matchedDms.lon;
-                    if (kvStdPhone.length !== 10) finalPhone = matchedDms.std_phone;
-                    finalAddr = matchedDms.addr || kvAddr;
-                    dmsCode = matchedDms.id;
-                    dmsName = matchedDms.name;
+      XLSX.writeFile(wb, "Data_KhachHang_Master_KiotViet.xlsx");
+    }
 
-                    if (needReview) {
-                        reviewList.push({
-                            'Mã KH KiotViet': kvId,
-                            'Tên KH KiotViet': kvName,
-                            'Tên Cốt Lõi (KV)': kvCoreName,
-                            'SĐT KiotViet': kvStdPhone,
-                            'Địa chỉ KiotViet': kvAddr,
-                            'Mã DMS Gợi ý': dmsCode,
-                            'Tên DMS Gợi ý': dmsName,
-                            'Tọa độ Gợi ý': `${latOut}, ${lonOut}`,
-                            'Điểm tương đồng (%)': Math.round(matchScore),
-                            'Lý do nghi ngờ': `Đã gán tự động (${matchTier}) nhưng cần kiểm tra chéo`
-                        });
-                    }
-                } else {
-                    if (!isValidBdAddress(kvAddr)) {
-                        finalAddr = `[Cần cập nhật Đ/C thực tế] ${kvName}`;
-                    }
-                }
-
-                let hasGps = (latOut !== null && lonOut !== null);
-                results.push({
-                    'Mã khách hàng KiotViet': kvId,
-                    'Tên khách hàng KiotViet': kvName,
-                    'SĐT chuẩn': finalPhone,
-                    'Vĩ độ (Lat)': latOut,
-                    'Kinh độ (Long)': lonOut,
-                    'Tọa độ GPS': hasGps ? `${latOut}, ${lonOut}` : "",
-                    'Địa chỉ thực tế tại Bình Dương': finalAddr,
-                    'Trạng thái': hasGps ? "Đã có GPS" : "Chưa có GPS",
-                    'Loại cơ chế khớp': matchTier,
-                    'Mã DMS tham chiếu': dmsCode,
-                    'Tên DMS tham chiếu': dmsName
-                });
-            });
-
-            finalMasterData = results;
-            finalReviewData = reviewList;
-
-            // Thống kê
-            let total = results.length;
-            let matched = results.filter(r => r['Trạng thái'] === 'Đã có GPS').length;
-            let rate = total > 0 ? ((matched / total) * 100).toFixed(2) : 0;
-
-            document.getElementById('statTotal').innerText = total.toLocaleString();
-            document.getElementById('statMatched').innerText = matched.toLocaleString();
-            document.getElementById('statRate').innerText = rate + '%';
-            document.getElementById('statReview').innerText = reviewList.length.toLocaleString();
-
-            renderTables();
-            document.getElementById('resultsSection').classList.remove('hidden');
-            window.scrollTo({ top: 400, behavior: 'smooth' });
-        }
-
-        function renderTables() {
-            let masterBody = document.getElementById('masterTableBody');
-            masterBody.innerHTML = finalMasterData.slice(0, 50).map(r => `
-                <tr class="hover:bg-slate-50">
-                    <td class="p-3 font-medium text-slate-900">${r['Mã khách hàng KiotViet']}</td>
-                    <td class="p-3">${r['Tên khách hàng KiotViet']}</td>
-                    <td class="p-3">${r['SĐT chuẩn']}</td>
-                    <td class="p-3 font-mono text-xs text-blue-600">${r['Tọa độ GPS']}</td>
-                    <td class="p-3"><span class="px-2 py-1 rounded-full text-xs font-semibold ${r['Trạng thái'] === 'Đã có GPS' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}">${r['Trạng thái']}</span></td>
-                    <td class="p-3 text-xs text-slate-500">${r['Loại cơ chế khớp']}</td>
-                </tr>
-            `).join('');
-
-            let reviewBody = document.getElementById('reviewTableBody');
-            reviewBody.innerHTML = finalReviewData.map(r => `
-                <tr class="hover:bg-slate-50">
-                    <td class="p-3 font-medium text-slate-900">${r['Mã KH KiotViet']}</td>
-                    <td class="p-3">${r['Tên KH KiotViet']}</td>
-                    <td class="p-3">${r['Tên DMS Gợi ý']}</td>
-                    <td class="p-3 font-mono text-xs text-blue-600">${r['Tọa độ Gợi ý']}</td>
-                    <td class="p-3 font-semibold text-amber-600">${r['Điểm tương đồng (%)']}%</td>
-                    <td class="p-3 text-xs text-slate-500">${r['Lý do nghi ngờ']}</td>
-                </tr>
-            `).join('');
-        }
-
-        function switchTab(tab) {
-            let masterTab = document.getElementById('tabMaster');
-            let reviewTab = document.getElementById('tabReview');
-            let masterBtn = document.getElementById('tabMasterBtn');
-            let reviewBtn = document.getElementById('tabReviewBtn');
-
-            if (tab === 'master') {
-                masterTab.classList.remove('hidden');
-                reviewTab.classList.add('hidden');
-                masterBtn.className = "px-6 py-4 font-semibold text-sm text-blue-600 border-b-2 border-blue-600 bg-white";
-                reviewBtn.className = "px-6 py-4 font-semibold text-sm text-slate-500 hover:text-slate-700";
-            } else {
-                reviewTab.classList.remove('hidden');
-                masterTab.classList.add('hidden');
-                reviewBtn.className = "px-6 py-4 font-semibold text-sm text-blue-600 border-b-2 border-blue-600 bg-white";
-                masterBtn.className = "px-6 py-4 font-semibold text-sm text-slate-500 hover:text-slate-700";
-            }
-        }
-
-        function downloadExcel() {
-            let wb = XLSX.utils.book_new();
-            
-            let ws1 = XLSX.utils.json_to_sheet(finalMasterData);
-            let ws2 = XLSX.utils.json_to_sheet(finalReviewData);
-            
-            let total = finalMasterData.length;
-            let matched = finalMasterData.filter(r => r['Trạng thái'] === 'Đã có GPS').length;
-            let summary = [
-                { 'Chỉ số thống kê': 'Tổng số Mã KH KiotViet (Unique)', 'Giá trị': total },
-                { 'Chỉ số thống kê': 'Tổng số KH đã gán được tọa độ GPS', 'Giá trị': matched },
-                { 'Chỉ số thống kê': 'Tổng số KH chưa có tọa độ GPS', 'Giá trị': total - matched },
-                { 'Chỉ số thống kê': 'Tỷ lệ khớp tự động thành công (%)', 'Giá trị': total > 0 ? ((matched/total)*100).toFixed(2) + '%' : '0%' },
-                { 'Chỉ số thống kê': 'Số điểm nghi ngờ cần duyệt tay (Sheet 2)', 'Giá trị': finalReviewData.length }
-            ];
-            let ws3 = XLSX.utils.json_to_sheet(summary);
-
-            XLSX.utils.book_append_sheet(wb, ws1, "1_Master_Data_KiotViet");
-            XLSX.utils.book_append_sheet(wb, ws2, "2_Danh_Sach_Can_Duyet");
-            XLSX.utils.book_append_sheet(wb, ws3, "3_Bao_Cao_Thong_Ke");
-
-            XLSX.writeFile(wb, "Data_KhachHang_Master_KiotViet.xlsx");
-        }
-    </script>
+    // Khởi chạy bản đồ ngay khi tải trang
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      lucide.createIcons();
+    });
+  </script>
 </body>
 </html>
